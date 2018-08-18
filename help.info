@@ -1,0 +1,41 @@
+HELP FOR LUSTRO-GSS SOFTWARE by Mikolaj Owczarzak 2018
+
+This is a terminal for the LUSTRO BEXUS experiment. 
+It allows the operator to set all of the experiment's 
+configureable parametres, like motor's speed and measurements
+frequency.
+
+Please note that if no command provided last command will be executed.
+Available commands:
+
+# operational:
+stopm				Stop motors
+
+go-idle			Turn off the motors and data gathering
+status			Check experiment's status
+
+go-scanning		Turn the scanning mode on
+send-nth 			Send every N-th set of measurements to Ground Station
+get-htp			Get humidity, temperature and pressure data
+get-photo 			Get data from set of photodetectors
+get-speed 			Get actual motor's speed
+get-speed-fast		Display last motors' speeds set by set-speed command
+get-uc-temp		Check the microcontroller's temperature
+
+go-manual			enable additional commands, listed below
+set-speed arg1 arg2	set selected (arg1 [1-2]) motor's speed (arg2 [0-255])
+set-frequency arg	set measurements' frequency according to arg value
+mknlog 			make new logfile on SD card
+save-htp			Save humidity, temperature and pressure data on SD card
+
+# networking:
+set-ip arg			set destination's ip as arg and save it in configfile
+set-port arg		set destination's targeted port as arg and save it in 
+				configfile
+set-address arg1 arg2	set destination's ip as arg1 and port as arg2 and save 
+			them in configile
+show-address		display current destination's ip and port from configfile
+
+# other:
+help			display this document
+exit			close the program
