@@ -12,6 +12,8 @@ class cmdSSG(cmd.Cmd):
     port = 0
     ip = ""
     timeout = 0
+    BUFFER_SIZE = 1024
+    configfilename = "config.cfg"
 
     def handshake():
         """check weather connection with OBC is possible"""
@@ -19,27 +21,32 @@ class cmdSSG(cmd.Cmd):
         sock.connect("localhost", 12000)
 
     def send(self, msg):
+        #TODO: osobna klasaa do wysylania?
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((self.ip, self.port))
+        sock.send(msg)
+        data = sock.recv(self.BUFFER_SIZE)
+        sock.close()
+        print("recived data:" + data)
+        
+            
+    def streamDown(self):
+        #TODO: dokonczyc, ale w odrebnej klasie
         try:
             sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
             sock.connect((self.ip, self.port))
-            msg=bytes(msg, 'utf-8')
-            sock.send(msg)
-            sock.shutdown(socket.SHUT_RDWR)
-            sock.close()
+            sock.bind()
         except OSError as err:
             print("OS error: {0}".format(err))
-            sock.shutdown(socket.SHUT_RDWR)
-            sock.close()
         except ValueError:
             print("Could not convert data to an integer.")
-            sock.shutdown(socket.SHUT_RDWR)
-            sock.close()
         except:
             print("Unexpected error:", sys.exc_info()[0])
+            raise
+        finally:
             sock.shutdown(socket.SHUT_RDWR)
             sock.close()
-            raise
-            
+    
     def do_tmp(self, msg):
         self.send(msg)
         
@@ -68,7 +75,7 @@ class cmdSSG(cmd.Cmd):
 
     def preloop(self):
         print("Starting GSS...")
-        configfilename = "config.cfg"
+        #configfilename = "config.cfg"
         self.speed1 = 0
         self.speed2 = 0
         self.port = 0
@@ -78,20 +85,19 @@ class cmdSSG(cmd.Cmd):
         #configure
         print("setting networking parameters...")
         try:
-            f=open(configfilename)
+            f=open(self.configfilename)
             line = f.readline()
-            self.port, self.ip = line.split()
-            self.ip = int(self.ip)
+            self.ip, self.port = line.split()
             print("port: ",self.port)
             print("ip: ",self.ip)
         except OSError:
-            print("file ",configfilename," cannot be found. File will be created now.")
+            print("file ",self.configfilename," cannot be found. File will be created now.")
             try:
-                fo=open(configfilename, "w+")
+                fo=open(self.configfilename, "w+")
                 self.ip = input("Please pass the ip:\n")
                 self.port = int(input("Pass the port:\n"))
-                tmp = self.ip + " " + str(self.port)
-                fo.write(tmp)
+                msg = self.ip + " " + str(self.port)
+                fo.write(msg)
             except OSError as e:
                 print("OS error: ",e)
                 raise SystemExit
@@ -104,7 +110,6 @@ class cmdSSG(cmd.Cmd):
             raise SystemExit
         else:
             f.close()
-        #TODO: handshake
 
     def do_shell(self, line):
         """Run a shell command"""
@@ -193,19 +198,53 @@ class cmdSSG(cmd.Cmd):
     # *networking:
     def do_set_ip(self, args):
         """set destination's ip as arg and save it in configfile"""
-        pass
+        self.ip = args
+        try:
+            f=open(self.configfilename, "r+")
+            line = self.ip + " " + str(self.port)
+            f.seek(0)
+            f.write(line)
+            print("ip set to: ",self.ip)
+        except ValueError as e:
+            print("OS error: ",e,"\nPlease review how config.cfg file looks like")
+            raise SystemExit
+        else:
+            f.close()
 
     def do_set_port(self, args):
         """set destination's targeted port as arg and save it in """
-        pass
+        self.port = args
+        try:
+            f=open(self.configfilename, "r+")
+            line = self.ip + " " + str(self.port)
+            f.seek(0)
+            f.write(line)
+            print("port set to: ",self.port)
+        except ValueError as e:
+            print("OS error: ",e,"\nPlease review how config.cfg file looks like")
+            raise SystemExit
+        else:
+            f.close()
 
     def do_set_address(self, args):
         """set destination's ip as arg1 and port as arg2 and save them in configile"""
-        pass
+        self.ip,self.port = args.split()
+        try:
+            f=open(self.configfilename, "r+")
+            line = self.ip + " " + str(self.port)
+            f.seek(0)
+            f.write(line)
+            print("ip set to: ",self.ip)
+            print("port set to: ",self.port)
+        except ValueError as e:
+            print("OS error: ",e,"\nPlease review how config.cfg file looks like")
+            raise SystemExit
+        else:
+            f.close()
 
     def do_show_address(self, args):
         """display current destination's ip and port from configfile"""
-        pass
+        print("current address: " + self.ip + "/" + str(self.port))
 
     # *other
     def do_help(self, args):
