@@ -7,18 +7,22 @@ import socket
 class cmdSSG(cmd.Cmd):
     """This is a terminal for the LUSTRO BEXUS experiment. \nIt allows the operator to set all of the experiment's\nconfigureable parametres, like motor's speed and measurements\nfrequency."""
     #variables & mechanics of cmd
-
+    speed1 = 0
+    speed2 = 0
+    port = 0
+    ip = ""
+    timeout = 0
 
     def handshake():
         """check weather connection with OBC is possible"""
         sock = socket.socket(socket.AF_INET, soclet.SOCK_DGRAM)
         sock.connect("localhost", 12000)
 
-    def do_tmp(self, args):
+    def send(self, msg):
         try:
             sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-            sock.connect(("127.0.0.1",12000))
-            msg=b"sending message"
+            sock.connect((self.ip, self.port))
+            msg=bytes(msg, 'utf-8')
             sock.send(msg)
             sock.shutdown(socket.SHUT_RDWR)
             sock.close()
@@ -35,6 +39,9 @@ class cmdSSG(cmd.Cmd):
             sock.shutdown(socket.SHUT_RDWR)
             sock.close()
             raise
+            
+    def do_tmp(self, msg):
+        self.send(msg)
         
     def configure(conf_file, ip, port):
         #TODO: czy wszystkie wyjatki obsluzone? co jezeli nie ma pliku?
