@@ -14,6 +14,7 @@ class cmdSSG(cmd.Cmd):
     timeout = 0
     BUFFER_SIZE = 1024
     configfilename = "config.cfg"
+    command_dict = {}
 
     def handshake():
         """check weather connection with OBC is possible"""
@@ -109,6 +110,20 @@ class cmdSSG(cmd.Cmd):
             print("OS error: ",e,"\nPlease review how config.cfg file looks like")
             raise SystemExit
         else:
+            f.close()
+        
+        #setting commands codes
+        try:
+            f=open("command.dict", "r")
+            for line in f:
+                tmp1,tmp2 = line.split()
+                self.command_dict[tmp2] = tmp1
+        except KeyError as e:
+            print("key is not in the map. Original message: " + e)
+        except OSError as e:
+            print("OS error: ",e)
+            raise SystemExit
+        finally:
             f.close()
 
     def do_shell(self, line):
