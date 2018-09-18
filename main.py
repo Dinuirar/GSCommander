@@ -12,7 +12,7 @@ class cmdSSG(cmd.Cmd):
     BUFFER_SIZE = 1024
     configfilename = "config.cfg"
     command_dict = {}
-    results_file = "readings.res"
+    results_file = "readings.txt"
 
     # def handshake(self):
     #     """check weather connection with OBC is possible"""
@@ -40,7 +40,6 @@ class cmdSSG(cmd.Cmd):
                 logging.debug('debug msg')
                 data, address = sock.recvfrom(1024)
                 # TODO: check recvfromto
-                print("received data: ")
                 f.write(data.decode("utf-8"))
 
         except OSError as err:
@@ -56,12 +55,11 @@ class cmdSSG(cmd.Cmd):
             sock.close()
             f.close()
     
-    def do_tmp(self, msg):
-        #self.send(msg)
-        self.streamDown()
+    # def do_tmp(self, msg):
+    #     #self.send(msg)
+    #     self.streamDown()
         
     # def configure(conf_file, ip, port):
-    #     #TODO: do usuniecia?
     #     try:
     #         f=open(conf_file)
     #         line = f.readline()
@@ -84,8 +82,8 @@ class cmdSSG(cmd.Cmd):
     #         f.close()
 
     def preloop(self):
-        print("Starting GSS...")
         logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+        logging.info("Starting GSS...")
         #configfilename = "config.cfg"
         self.speed1 = 0
         self.speed2 = 0
@@ -94,15 +92,32 @@ class cmdSSG(cmd.Cmd):
         self.timeout = 0
         
         #configure
-        print("setting networking parameters...")
+        logging.info("setting networking parameters...")
         try:
-            f=open(self.configfilename)
+            f=open(self.configfilename, "r+")
             line = f.readline()
-            self.ip, self.port = line.split()
-            print("port: ",self.port)
-            print("ip: ",self.ip)
-        except OSError:
-            print("file ",self.configfilename," cannot be found. File will be created now.")
+            ip_tmp, port_tmp = line.split()
+            try:
+                self.port = int(port_tmp)
+                if not (self.port <= 65535 and self.port >= 0):
+                    logging.warning('port value in configure file outside of range.')
+                    self.port = input()
+                    f.seek(0)
+                    f.write(ip_tmp + " " + self.port)
+            except ValueError as e:
+                logging.warning('Configure file error: ' + str(e))
+                self.port = input("Pass correct value now:\n")
+            try:
+                socket.inet_aton(ip_tmp)
+            except socket.error:
+                logging.warning('Ip address error in configuration file.')
+                self.ip = input("Pass correct value now:\n")
+            else:
+                self.ip = ip_tmp
+            print("port: ", self.port)
+            print("ip: ", self.ip)
+        except OSError:  # no config file
+            print("file ", self.configfilename, " cannot be found. File will be created now.")
             try:
                 fo=open(self.configfilename, "w+")
                 self.ip = input("Please pass the ip:\n")
@@ -110,16 +125,16 @@ class cmdSSG(cmd.Cmd):
                 msg = self.ip + " " + str(self.port)
                 fo.write(msg)
             except OSError as e:
-                print("OS error: ",e)
+                print("OS error: ", e)
                 raise SystemExit
-            else:
+            finally:
                 fo.close()
                 
             print(self.ip," ",self.port)
         except ValueError as e:
-            print("OS error: ",e,"\nPlease review how config.cfg file looks like")
+            print("OS error: ", e, "\nPlease review how config.cfg file looks like")
             raise SystemExit
-        else:
+        finally:
             f.close()
         
         #setting commands codes
@@ -131,7 +146,7 @@ class cmdSSG(cmd.Cmd):
         except KeyError as e:
             print("key is not in the map. Original message: " + e)
         except OSError as e:
-            print("OS error: ",e)
+            print("OS error: ", e)
             raise SystemExit
         finally:
             f.close()
@@ -145,13 +160,18 @@ class cmdSSG(cmd.Cmd):
 
     # Commands
     # *operational:
+    def do_strem_cont(self):
+        """Continuous reading data from OBC"""
+        # TODO: dodac do helpa
+        self.streamDown()
+
     def do_stopm(self, args):
         """Stop motors"""
         self.send(self.command_dict["sudo_stopm"])
 
     def do_go_idle(self, a):
         """Turn off the motors and data gathering"""
-        self.send(self.command_dict["sudo_set_status"]+" 0")
+        self.send(self.command_dict["sudo_set_status"]+"0")
 
     def do_status(self, args):
         """Check experiment's status"""
@@ -159,15 +179,18 @@ class cmdSSG(cmd.Cmd):
 
     def do_go_scanning(self, args):
         """Turn the scanning mode on"""
-        self.send(self.command_dict["sudo_set_status"] + " 1")
+        self.send(self.command_dict["sudo_set_status"] + "1")
+        self.streamDown()
 
     def do_send_nth(self, args):
         """Send every N-th set of measurements to Ground Station"""
         self.send(self.command_dict["send_nth"] + str(args))
+        self.streamDown()
     
     def do_get_htp(self, args):
         """Get humidity, temperature and pressure data"""
         self.send(self.command_dict["get_htp"])
+        # TODO: gety maja być TCP
 
     def do_get_photo(self, args):
         """Get data from set of photodetectors"""
@@ -184,13 +207,14 @@ class cmdSSG(cmd.Cmd):
     def do_get_uc_temp(self, args):
         """Check the microcontroller's temperature"""
         self.send(self.command_dict["get_uc_temp"])
+        # TODO: czy temp jest zwracana do GS?
 
     def do_go_manual(self, args):
-        """Check the microcontroller's temperature"""
+        """Enable additional commands: set_speed, set_frequency, mknlog, save_htp"""
         self.send(self.command_dict["sudo_set_status"] + " 2")
 
     def do_set_speed(self, args):
-        #TODO: usunac speed2
+        #TODO: usunac speed2 po rozmowie z Mikolajem
         """set selected (arg1 [1-2]) motor's speed (arg2 [0-255])"""
         arg1,arg2 = args.split()
         arg1 = int(arg1)
@@ -248,9 +272,9 @@ class cmdSSG(cmd.Cmd):
             line = self.ip + " " + str(self.port)
             f.seek(0)
             f.write(line)
-            print("port set to: ",self.port)
+            print("port set to: ", self.port)
         except ValueError as e:
-            print("OS error: ",e,"\nPlease review how config.cfg file looks like")
+            print("OS error: ", e, "\nPlease review how config.cfg file looks like")
             raise SystemExit
         else:
             f.close()
