@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-import cmd
-import os
-import sys
-import socket
+import cmd, os, sys, socket, logging
 
 class cmdSSG(cmd.Cmd):
     """This is a terminal for the LUSTRO BEXUS experiment. \nIt allows the operator to set all of the experiment's\nconfigureable parametres, like motor's speed and measurements\nfrequency."""
@@ -15,28 +12,37 @@ class cmdSSG(cmd.Cmd):
     BUFFER_SIZE = 1024
     configfilename = "config.cfg"
     command_dict = {}
+    results_file = "readings.res"
 
-    def handshake():
-        """check weather connection with OBC is possible"""
-        sock = socket.socket(socket.AF_INET, soclet.SOCK_DGRAM)
-        sock.connect("localhost", 12000)
+    # def handshake(self):
+    #     """check weather connection with OBC is possible"""
+    #     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    #     sock.connect("localhost", 12000)
 
     def send(self, msg):
-        #TODO: osobna klasaa do wysylania?
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((self.ip, self.port))
-        sock.send(msg)
-        data = sock.recv(self.BUFFER_SIZE)
+        sock.connect((self.ip, int(self.port)))
+        sock.send(msg.encode("utf-8"))
         sock.close()
-        print("recived data:" + data)
-        
-            
+
     def streamDown(self):
-        #TODO: dokonczyc, ale w odrebnej klasie
+        # TODO: write to file
         try:
             sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-            sock.connect((self.ip, self.port))
-            sock.bind()
+            sock.bind((self.ip, int(self.port)))
+            print("Waiting for data...")
+            if os.path.exists(self.results_file):
+                aw = 'a'
+            else:
+                aw = 'w'
+            f = open(self.results_file, aw)
+            while True:
+                logging.debug('debug msg')
+                data, address = sock.recvfrom(1024)
+                # TODO: check recvfromto
+                print("received data: ")
+                f.write(data.decode("utf-8"))
+
         except OSError as err:
             print("OS error: {0}".format(err))
         except ValueError:
@@ -45,37 +51,41 @@ class cmdSSG(cmd.Cmd):
             print("Unexpected error:", sys.exc_info()[0])
             raise
         finally:
-            sock.shutdown(socket.SHUT_RDWR)
+            print("Closing connection...")
+            #sock.shutdown(socket.SHUT_RDWR)
             sock.close()
+            f.close()
     
     def do_tmp(self, msg):
-        self.send(msg)
+        #self.send(msg)
+        self.streamDown()
         
-    def configure(conf_file, ip, port):
-        #TODO: czy wszystkie wyjatki obsluzone? co jezeli nie ma pliku?
-        try:
-            f=open(conf_file)
-            line = f.readline()
-            port, ip = line.split()
-        except OSError:
-            print("file ",conf_file," cannot be found. File will be created now.\nPlease pass the ip:")
-            try:
-                fo=open(conf_file, "w+")
-                fo.write(self.port," ",self.ip)
-            except OSError as e:
-                print("OS error: ",e)
-            else:
-                fo.close()
-            ip = input("abc")
-            print("Pass the port:")
-            port = int(sys.stdin)
-            print(ip," ",port)
-            
-        else:
-            f.close()
+    # def configure(conf_file, ip, port):
+    #     #TODO: do usuniecia?
+    #     try:
+    #         f=open(conf_file)
+    #         line = f.readline()
+    #         port, ip = line.split()
+    #     except OSError:
+    #         print("file ",conf_file," cannot be found. File will be created now.\nPlease pass the ip:")
+    #         try:
+    #             fo=open(conf_file, "w+")
+    #             fo.write(self.port," ",self.ip)
+    #         except OSError as e:
+    #             print("OS error: ",e)
+    #         else:
+    #             fo.close()
+    #         ip = input("abc")
+    #         print("Pass the port:")
+    #         port = int(sys.stdin)
+    #         print(ip," ",port)
+    #
+    #     else:
+    #         f.close()
 
     def preloop(self):
         print("Starting GSS...")
+        logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
         #configfilename = "config.cfg"
         self.speed1 = 0
         self.speed2 = 0
@@ -133,40 +143,39 @@ class cmdSSG(cmd.Cmd):
         print (output)
         self.last_output = output
 
-    
     # Commands
     # *operational:
     def do_stopm(self, args):
         """Stop motors"""
-        pass
-        
+        self.send(self.command_dict["sudo_stopm"])
+
     def do_go_idle(self, a):
         """Turn off the motors and data gathering"""
-        pass
+        self.send(self.command_dict["sudo_set_status"]+" 0")
 
     def do_status(self, args):
         """Check experiment's status"""
-        pass
+        self.send(self.command_dict["get_status"])
 
     def do_go_scanning(self, args):
         """Turn the scanning mode on"""
-        pass
+        self.send(self.command_dict["sudo_set_status"] + " 1")
 
     def do_send_nth(self, args):
         """Send every N-th set of measurements to Ground Station"""
-        pass
+        self.send(self.command_dict["send_nth"] + str(args))
     
     def do_get_htp(self, args):
         """Get humidity, temperature and pressure data"""
-        pass
+        self.send(self.command_dict["get_htp"])
 
     def do_get_photo(self, args):
         """Get data from set of photodetectors"""
-        pass
+        self.send(self.command_dict["get_photo"])
 
     def do_get_speed(self, args):
         """Get actual motor's speed"""
-        pass
+        # TODO: brakuje komendy
 
     def do_get_speed_fast(self, args):
         """Display last motors' speeds set by set-speed command"""
@@ -174,14 +183,14 @@ class cmdSSG(cmd.Cmd):
 
     def do_get_uc_temp(self, args):
         """Check the microcontroller's temperature"""
-        pass
+        self.send(self.command_dict["get_uc_temp"])
 
     def do_go_manual(self, args):
         """Check the microcontroller's temperature"""
-        pass
+        self.send(self.command_dict["sudo_set_status"] + " 2")
 
     def do_set_speed(self, args):
-        #TODO: przekazac speed1 i speed2
+        #TODO: usunac speed2
         """set selected (arg1 [1-2]) motor's speed (arg2 [0-255])"""
         arg1,arg2 = args.split()
         arg1 = int(arg1)
@@ -195,19 +204,24 @@ class cmdSSG(cmd.Cmd):
                 print("speed of motor no 2 is set to {0}".format(arg2))
         elif not (arg1 == 1 or arg1 == 2):
             print("First argument must be 1 or 2! Enter 'help' for more info")
+            return
         else:
             print("Second argument must be from 0-255!")
+            return
+        self.send(self.command_dict["set_speed"] + " " + self.speed1)
     
     def do_set_frequency(self, args):
         """set measurements' frequency according to arg value"""
+        # TODO: brak komendy
         pass
 
     def do_mknlog(self, args):
         """make new logfile on SD card"""
-        pass
+        self.send(self.command_dict["mknlog"])
 
     def do_save_htp(self, args):
         """Save humidity, temperature and pressure data on SD card"""
+        # TODO: brak komendy
         pass
     
     # *networking:
@@ -273,15 +287,6 @@ class cmdSSG(cmd.Cmd):
         print ("Exiting")
         raise SystemExit
 
-    
-
-    
-
-    
-
-    
-
-    
 
 if __name__ == "__main__":
     # execute only if run as a script
