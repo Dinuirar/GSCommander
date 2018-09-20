@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import socket
 import sys
+import traceback
+import pdb
 
 
 def main():
@@ -18,12 +20,16 @@ def main():
                 break
             msg = data.decode("utf-8")
             print("Message: " + msg)
+            conn.send(bytes("received message: "+msg, "utf-8"))
 
     except KeyboardInterrupt:
         print("exiting")
 
-    except OSError as err:
-        print("OS error: {0}".format(err))
+    except OSError:  # as err:
+        # print("OS error: {0}".format(err))
+        # extype, value, tb = sys.exc_info()
+        traceback.print_exc()
+        # pdb.post_mortem(tb)
 
     except ValueError:
         print("Could not convert data to an integer.")
