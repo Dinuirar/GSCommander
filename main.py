@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import cmd, os, sys, socket, logging, datetime
+import cmd, os, sys, socket, logging, datetime, traceback
 
 class cmdSSG(cmd.Cmd):
     """This is a terminal for the LUSTRO BEXUS experiment. \nIt allows the operator to set all of the experiment's\nconfigureable parametres, like motor's speed and measurements\nfrequency."""
@@ -14,42 +14,81 @@ class cmdSSG(cmd.Cmd):
     command_dict = {}
     results_file = "readings.txt"
 
+    def precmd(self, line):
+        try:
+            logging.info("Executing {0} method".format(line.split()[0]))
+        except IndexError:
+            logging.info("Exception omitted in case of empty line")
+        return line
+
     def send(self, msg):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((self.ip, int(self.port)))
         sock.send(msg.encode("utf-8"))
         sock.close()
 
+    def log_exception(self, msg):
+        logging.exception(msg=msg)
+        print(msg)
+
+    def log_error(self, msg):
+        logging.error(msg=msg)
+        print(msg)
+
+    def log_warning(self, msg):
+        logging.warning(msg=msg)
+        print(msg)
+
+    def log_info(self, msg):
+        logging.info(msg=msg)
+        print(msg)
 
     def streamDown(self):
-        # TODO: write to file
+        # TODO: keyboardinterrupt
+        logging.info("streamDown method used")
+        print("1")
         try:
-            sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.bind((self.ip, int(self.port)))
-            print("Waiting for data...")
+            self.log_info("Waiting for data...")
             if os.path.exists(self.results_file):
                 aw = 'a'
             else:
                 aw = 'w'
             f = open(self.results_file, aw)
+            print("2")
             while True:
-                logging.debug('debug msg')
-                sock.settimeout(self.TIMEOUT)
-                data, address = sock.recvfrom(self.BUFFER_SIZE)
-                # TODO: check recvfromto
-                f.write(data.decode("utf-8"))
+                # if timeout show message and continue, else save data to file
+                try:
+                    sock.settimeout(self.TIMEOUT)
+                    print("3")
+                except socket.timeout:
+                    msg = "Socket timeout. Data not received"
+                    self.log_error(msg)
+                except KeyboardInterrupt:
+                    self.log_info("Method manually interrupted. Back to main loop")
+                else:
+                    data, address = sock.recvfrom(self.BUFFER_SIZE)
+                    f.write(data.decode("utf-8"))
 
         except OSError as err:
-            print("OS error: {0}".format(err))
+            msg = "OS error. Trace in log. Error contents: {0}".format(err)
+            self.log_exception(msg)
+
         except ValueError:
-            print("Could not convert data to an integer.")
-        except socket.timeout:
-            print("Socket timeout. Data not received")
+            msg = "Could not convert data to an integer."
+            self.log_exception(msg)
+
+        except KeyboardInterrupt:
+            self.log_info("Method manually interrupted. Back to main loop")
+
         except:
-            print("Unexpected error:", sys.exc_info()[0])
+            msg = "Unexpected error:", sys.exc_info()[0]
+            self.log_exception(msg)
             raise
+
         finally:
-            print("Closing connection...")
+            self.log_info("Closing connection...")
             #sock.shutdown(socket.SHUT_RDWR)
             sock.close()
             f.close()
@@ -62,7 +101,7 @@ class cmdSSG(cmd.Cmd):
             sock.settimeout(self.TIMEOUT)
             data = sock.recv(self.BUFFER_SIZE)
         except socket.timeout:
-            print("socket timeout. Data not received")
+            self.log_warnirg("socket timeout. Data not received")
         else:
             sock.close()
             return data.decode("utf-8")
@@ -70,10 +109,10 @@ class cmdSSG(cmd.Cmd):
     def save_results(self, data):
         if os.path.exists(self.results_file):
             aw = 'a'
-            print("appending to file")
+            self.log_info("appending to file {0}".format(self.results_file))
         else:
             aw = 'w'
-            print("file for result will be created")
+            self.log_info("file for result will be created")
         f = open(self.results_file, aw)
         f.write(data)
         f.close()
@@ -106,7 +145,6 @@ class cmdSSG(cmd.Cmd):
 
     def preloop(self):
         # setting up logger
-        # TODO: poprawic printy i logi (osobna funkcja do printowania i jednoczesnego logowania)
         log_name = datetime.datetime.now().strftime("%y%m%d") + ".log"
         log_formatter = logging.Formatter(fmt="%(asctime)s %(levelname)s: %(message)s",
                                           datefmt='%Y/%m/%d %H:%M:%S'
@@ -124,6 +162,7 @@ class cmdSSG(cmd.Cmd):
         # #console_handler = logging.StreamHandler(sys.stdout)
         # root_logger.addHandler(console_handler)
 
+        logging.info("Starting new session")
         self.speed1 = 0
         self.speed2 = 0
         self.port = 0
@@ -131,7 +170,7 @@ class cmdSSG(cmd.Cmd):
         self.TIMEOUT = 2.0
         
         #configure
-        logging.info("setting networking parameters...")
+        logging.info("Setting networking parameters...")
         try:
             f=open(self.configfilename, "r+")
             line = f.readline()
@@ -139,25 +178,24 @@ class cmdSSG(cmd.Cmd):
             try:
                 self.port = int(port_tmp)
                 if not (self.port <= 65535 and self.port >= 0):
-                    # TODO: tu skończyłem
+                    # TODO: poprawić tak żeby był pętla
                     msg = 'port value in configure file outside of range.'
-                    logging.error(msg)
-                    print(msg)
+                    self.log_error(msg)
                     self.port = input()
                     f.seek(0)
                     f.write(ip_tmp + " " + self.port)
             except ValueError as e:
-                logging.error('Configure file error: ' + str(e))
+                self.log_info('Configure file error: ' + str(e))
                 self.port = input("Pass correct value now:\n")
             try:
                 socket.inet_aton(ip_tmp)
             except socket.error:
-                logging.error('Ip address error in configuration file.')
+                self.log_error('Ip address error in configuration file.')
                 self.ip = input("Pass correct value now:\n")
             else:
                 self.ip = ip_tmp
         except OSError:  # no config file
-            print("file ",self.configfilename, " cannot be found. File will be created now.")
+            self.log_warning("file " + self.configfilename + " cannot be found. File will be created now.")
             try:
                 fo=open(self.configfilename, "w+")
                 self.ip = input("Please pass the ip:\n")
@@ -165,19 +203,18 @@ class cmdSSG(cmd.Cmd):
                 msg = self.ip + " " + str(self.port)
                 fo.write(msg)
             except OSError as e:
-                logging.error("OS error: ", e)
+                self.log_exception("OS error: " + e)
                 raise SystemExit
             finally:
                 fo.close()
 
-            print(self.ip," ",self.port)
+                self.log_info("Address parameters: " + self.ip + " " + str(self.port))
         except ValueError as e:
-            print("OS error: ", e, "\nPlease review how config.cfg file looks like")
+            self.log_error("OS error: " + e + "\nPlease review how config.cfg file looks like")
             f.close()
             raise SystemExit
         else:
-            logging.info("port: " + str(self.port))
-            logging.info("ip: " + str(self.ip))
+            self.log_info("Address parameters: " + self.ip + " " + str(self.port))
             f.close()
         
         #setting commands codes
@@ -187,23 +224,24 @@ class cmdSSG(cmd.Cmd):
                 tmp1,tmp2 = line.split()
                 self.command_dict[tmp2] = tmp1
         except KeyError as e:
-            print("key is not in the map. Original message: " + e)
+            self.log_error("key is not in the map. Original message: " + e)
         except OSError as e:
-            print("OS error: ", e)
+            self.log_exception("OS error: " + e)
             raise SystemExit
         finally:
             f.close()
 
     def do_shell(self, line):
         """Run a shell command"""
-        print ("running shell command:", line)
+        # TODO: add to help
+        self.log_info("running shell command:" + line)
         output = os.popen(line).read()
-        print (output)
+        self.log_info(output)
         self.last_output = output
 
     # Commands
     # *operational:
-    def do_strem_cont(self):
+    def do_stream_cont(self, args):
         """Continuous reading data from OBC"""
         # TODO: dodac do helpa
         self.streamDown()
@@ -218,7 +256,8 @@ class cmdSSG(cmd.Cmd):
 
     def do_status(self, args):
         """Check experiment's status"""
-        self.send(self.command_dict["get_status"])
+        data = self.sendrec(self.command_dict["get_status"])
+        self.save_results(data)
 
     def do_go_scanning(self, args):
         """Turn the scanning mode on"""
@@ -248,7 +287,7 @@ class cmdSSG(cmd.Cmd):
 
     def do_get_speed_fast(self, args):
         """Display last motors' speeds set by set-speed command"""
-        print("speed motor1: {0}\nspeed motor2: {1}".format(self.speed1, self.speed2))
+        self.log_info("speed motor1: {0}\nspeed motor2: {1}".format(self.speed1, self.speed2))
 
     def do_get_uc_temp(self, args):
         """Check the microcontroller's temperature"""
@@ -268,15 +307,15 @@ class cmdSSG(cmd.Cmd):
         if (arg1 == 1 or arg1 == 2) and (arg2 > 0 and arg2 < 256):
             if arg1 ==1:
                 self.speed1 = arg2;
-                print("speed of motor no 1 is set to {0}".format(arg2))
+                self.log_info("speed of motor no 1 is set to {0}".format(arg2))
             elif arg1 == 2:
                 self.speed2 = arg2;
-                print("speed of motor no 2 is set to {0}".format(arg2))
+                self.log_info("speed of motor no 2 is set to {0}".format(arg2))
         elif not (arg1 == 1 or arg1 == 2):
-            print("First argument must be 1 or 2! Enter 'help' for more info")
+            self.log_warning("First argument must be 1 or 2! Enter 'help' for more info")
             return
         else:
-            print("Second argument must be from 0-255!")
+            self.log_warning("Second argument must be from 0-255!")
             return
         self.send(self.command_dict["set_speed"] + " " + self.speed1)
     
@@ -304,9 +343,9 @@ class cmdSSG(cmd.Cmd):
             line = self.ip + " " + str(self.port)
             f.seek(0)
             f.write(line)
-            print("ip set to: ",self.ip)
+            self.log_info("ip set to: " + self.ip)
         except ValueError as e:
-            print("OS error: ",e,"\nPlease review how config.cfg file looks like")
+            self.log_exception("OS error: " + e + "\nPlease review how config.cfg file looks like")
             raise SystemExit
         else:
             f.close()
@@ -319,9 +358,9 @@ class cmdSSG(cmd.Cmd):
             line = self.ip + " " + str(self.port)
             f.seek(0)
             f.write(line)
-            print("port set to: ", self.port)
+            self.log_info("port set to: " + self.port)
         except ValueError as e:
-            print("OS error: ", e, "\nPlease review how config.cfg file looks like")
+            self.log_exception("OS error: " + e + "\nPlease review how config.cfg file looks like")
             raise SystemExit
         else:
             f.close()
@@ -334,17 +373,17 @@ class cmdSSG(cmd.Cmd):
             line = self.ip + " " + str(self.port)
             f.seek(0)
             f.write(line)
-            print("ip set to: ",self.ip)
-            print("port set to: ",self.port)
+            self.log_info("ip set to: " + self.ip)
+            self.log_info("port set to: " + self.port)
         except ValueError as e:
-            print("OS error: ", e, "\nPlease review how config.cfg file looks like")
+            self.log_exception("OS error: " + e + "\nPlease review how config.cfg file looks like")
             raise SystemExit
         else:
             f.close()
 
     def do_show_address(self, args):
         """display current destination's ip and port from configfile"""
-        print("Current address: " + self.ip + "/" + str(self.port))
+        self.log_info("Current address: " + self.ip + "/" + str(self.port))
 
     def do_set_timeout(self, args):
         """set timeout time in seconds for UDP receiving socket"""
