@@ -21,11 +21,38 @@ class cmdSSG(cmd.Cmd):
             logging.info("Exception omitted in case of empty line")
         return line
 
+    # def send(self, msg):
+    #     try:
+    #         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    #         sock.connect((self.ip, int(self.port)))
+    #         sock.settimeout(self.TIMEOUT)
+    #         sock.send(msg.encode("utf-8"))
+    #         sock.close()
+    #     except socket.timeout:
+    #         msg = "Socket timeout. Data not received"
+    #         self.log_error(msg)
+    #     except OSError:
+    #         msg = "OS error. Trace in log."
+    #         self.log_exception(msg)
+    #     except KeyboardInterrupt:
+    #         self.log_info("Method manually interrupted. Back to main loop")
     def send(self, msg):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((self.ip, int(self.port)))
-        sock.send(msg.encode("utf-8"))
-        sock.close()
+        if len(msg) %2:
+            msg = '0' + msg
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect((self.ip, int(self.port)))
+            sock.settimeout(self.TIMEOUT)
+            sock.send(bytes.fromhex(msg))
+            sock.close()
+        except socket.timeout:
+            msg = "Socket timeout. Data not received"
+            self.log_error(msg)
+        except OSError:
+            msg = "OS error. Trace in log."
+            self.log_exception(msg)
+        except KeyboardInterrupt:
+            self.log_info("Method manually interrupted. Back to main loop")
 
     def log_exception(self, msg):
         logging.exception(msg=msg)
@@ -46,33 +73,33 @@ class cmdSSG(cmd.Cmd):
     def streamDown(self):
         # TODO: keyboardinterrupt
         logging.info("streamDown method used")
-        print("1")
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.bind((self.ip, int(self.port)))
+            sock.connect((self.ip, int(self.port)))
             self.log_info("Waiting for data...")
             if os.path.exists(self.results_file):
                 aw = 'a'
             else:
                 aw = 'w'
-            f = open(self.results_file, aw)
-            print("2")
-            while True:
-                # if timeout show message and continue, else save data to file
-                try:
-                    sock.settimeout(self.TIMEOUT)
-                    print("3")
-                except socket.timeout:
-                    msg = "Socket timeout. Data not received"
-                    self.log_error(msg)
-                except KeyboardInterrupt:
-                    self.log_info("Method manually interrupted. Back to main loop")
-                else:
-                    data, address = sock.recvfrom(self.BUFFER_SIZE)
-                    f.write(data.decode("utf-8"))
-
-        except OSError as err:
-            msg = "OS error. Trace in log. Error contents: {0}".format(err)
+            try:
+                f = open(self.results_file, aw)
+                while True:
+                    # if timeout show message and continue, else save data to file
+                    try:
+                        sock.settimeout(self.TIMEOUT)
+                    except socket.timeout:
+                        msg = "Socket timeout. Data not received"
+                        self.log_error(msg)
+                    except KeyboardInterrupt:
+                        self.log_info("Method manually interrupted. Back to main loop")
+                    else:
+                        data, address = sock.recvfrom(self.BUFFER_SIZE)
+                        f.write(data.decode("utf-8"))
+            except OSError:
+                msg = "OS error. Trace in log."
+                self.log_exception(msg)
+        except OSError:
+            msg = "OS error. Trace in log."
             self.log_exception(msg)
 
         except ValueError:
@@ -92,30 +119,38 @@ class cmdSSG(cmd.Cmd):
             #sock.shutdown(socket.SHUT_RDWR)
             sock.close()
             f.close()
+            return
 
     def sendrec(self, msg):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((self.ip, int(self.port)))
-        sock.send(msg.encode("utf-8"))
         try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect((self.ip, int(self.port)))
+            sock.send(msg.encode("utf-8"))
             sock.settimeout(self.TIMEOUT)
             data = sock.recv(self.BUFFER_SIZE)
         except socket.timeout:
-            self.log_warnirg("socket timeout. Data not received")
+            self.log_warning("Socket timeout. Data not received")
+            return None
+        except socket.error:
+            self.log_error("Could not connect to chosen address")
+            return None
         else:
             sock.close()
             return data.decode("utf-8")
 
     def save_results(self, data):
-        if os.path.exists(self.results_file):
-            aw = 'a'
-            self.log_info("appending to file {0}".format(self.results_file))
+        if data is not None:
+            if os.path.exists(self.results_file):
+                aw = 'a'
+                self.log_info("appending to file {0}".format(self.results_file))
+            else:
+                aw = 'w'
+                self.log_info("file for result will be created")
+            f = open(self.results_file, aw)
+            f.write(data)
+            f.close()
         else:
-            aw = 'w'
-            self.log_info("file for result will be created")
-        f = open(self.results_file, aw)
-        f.write(data)
-        f.close()
+            self.log_info("Data = None - no data saved")
 
     # def do_tmp(self, msg):
     #     #self.send(msg)
@@ -246,57 +281,103 @@ class cmdSSG(cmd.Cmd):
         # TODO: dodac do helpa
         self.streamDown()
 
+    def do_downstream_on(self, args):
+        """Start downstream"""
+
+    def do_downstream_off(self, args):
+        """Stop downstream"""
+
     def do_stopm(self, args):
         """Stop motors"""
-        self.send(self.command_dict["sudo_stopm"])
+        try:
+            self.send(self.command_dict["sudo_stopm"])
+        except KeyError:
+            self.log_exception("Wrong key. Check dictionary")
 
-    def do_go_idle(self, a):
+    def do_go_idle(self, args):
         """Turn off the motors and data gathering"""
-        self.send(self.command_dict["sudo_set_status"]+"0")
+        try:
+            self.send(self.command_dict["sudo_set_status"]+"0")
+        except KeyError:
+            self.log_exception("Wrong key. Check dictionary")
 
     def do_status(self, args):
         """Check experiment's status"""
-        data = self.sendrec(self.command_dict["get_status"])
+        try:
+            data = self.sendrec(self.command_dict["get_status"])
+        except KeyError:
+            self.log_exception("Wrong key. Check dictionary")
+            return
         self.save_results(data)
 
     def do_go_scanning(self, args):
         """Turn the scanning mode on"""
-        self.send(self.command_dict["sudo_set_status"] + "1")
+        try:
+            self.send(self.command_dict["sudo_set_status"] + "1")
+        except KeyError:
+            self.log_exception("Wrong key. Check dictionary")
+            return
         self.streamDown()
 
     def do_send_nth(self, args):
         """Send every N-th set of measurements to Ground Station"""
-        self.send(self.command_dict["send_nth"] + str(args))
+        try:
+            data = self.sendrec(self.command_dict["send_nth"] + str(args))
+        except KeyError:
+            self.log_exception("Wrong key. Check dictionary")
+            return
         self.streamDown()
     
     def do_get_htp(self, args):
         """Get humidity, temperature and pressure data"""
-        data = self.sendrec(self.command_dict["get_htp"])
+        try:
+            data = self.sendrec(self.command_dict["get_htp"])
+        except KeyError:
+            self.log_exception("Wrong key. Check dictionary")
+            return
         self.save_results(data)
 
     def do_get_photo(self, args):
         """Get data from set of photodetectors"""
-        data = self.sendrec(self.command_dict["get_photo"])
+        try:
+            data = self.sendrec(self.command_dict["get_photo"])
+        except KeyError:
+            self.log_exception("Wrong key. Check dictionary")
+            return
         self.save_results(data)
 
     def do_get_speed(self, args):
         """Get actual motor's speed"""
         # TODO: brakuje komendy
-        data = self.sendrec(self.command_dict["get_speed"])
+        try:
+            data = self.sendrec(self.command_dict["get_speed"])
+        except KeyError:
+            self.log_exception("Wrong key. Check dictionary")
+            return
         self.save_results(data)
 
     def do_get_speed_fast(self, args):
         """Display last motors' speeds set by set-speed command"""
-        self.log_info("speed motor1: {0}\nspeed motor2: {1}".format(self.speed1, self.speed2))
+        try:
+            self.log_info("speed motor1: {0}\nspeed motor2: {1}".format(self.speed1, self.speed2))
+        except KeyError:
+            self.log_exception("Wrong key. Check dictionary")
 
     def do_get_uc_temp(self, args):
         """Check the microcontroller's temperature"""
-        data = self.sendrecv(self.command_dict["get_uc_temp"])
+        try:
+            data = self.sendrecv(self.command_dict["get_uc_temp"])
+        except KeyError:
+            self.log_exception("Wrong key. Check dictionary")
+            return
         self.save_results(data)
 
     def do_go_manual(self, args):
         """Enable additional commands: set_speed, set_frequency, mknlog, save_htp"""
-        self.send(self.command_dict["sudo_set_status"] + " 2")
+        try:
+            self.send(self.command_dict["sudo_set_status"] + "2")
+        except KeyError:
+            self.log_exception("Wrong key. Check dictionary")
 
     def do_set_speed(self, args):
         #TODO: usunac speed2 po rozmowie z Mikolajem
@@ -317,23 +398,35 @@ class cmdSSG(cmd.Cmd):
         else:
             self.log_warning("Second argument must be from 0-255!")
             return
-        self.send(self.command_dict["set_speed"] + " " + self.speed1)
-    
+        try:
+            self.send(self.command_dict["set_speed"] + self.speed1)
+        except KeyError:
+            self.log_exception("Wrong key. Check dictionary")
+
     def do_set_frequency(self, args):
         """set measurements' frequency according to arg value"""
         # TODO: brak komendy
         # TODO: check weather amount of parameters is right and if they are correct
-        self.send(self.command_dict["set_frequency"] + args)
+        try:
+            self.send(self.command_dict["set_frequency"] + args)
+        except KeyError:
+            self.log_exception("Wrong key. Check dictionary")
 
     def do_mknlog(self, args):
         """make new logfile on SD card"""
-        self.send(self.command_dict["mknlog"])
+        try:
+            self.send(self.command_dict["mknlog"])
+        except KeyError:
+            self.log_exception("Wrong key. Check dictionary")
 
     def do_save_htp(self, args):
         """Save humidity, temperature and pressure data on SD card"""
         # TODO: brak komendy
-        self.send(self.command_dict["save_htp"])
-    
+        try:
+            self.send(self.command_dict["save_htp"])
+        except KeyError:
+            self.log_exception("Wrong key. Check dictionary")
+
     # *networking:
     def do_set_ip(self, args):
         """set destination's ip as arg and save it in configfile"""
@@ -383,7 +476,10 @@ class cmdSSG(cmd.Cmd):
 
     def do_show_address(self, args):
         """display current destination's ip and port from configfile"""
-        self.log_info("Current address: " + self.ip + "/" + str(self.port))
+        try:
+            self.log_info("Current address: " + self.ip + "/" + str(self.port))
+        except KeyError:
+            self.log_exception("Wrong key. Check dictionary")
 
     def do_set_timeout(self, args):
         """set timeout time in seconds for UDP receiving socket"""
