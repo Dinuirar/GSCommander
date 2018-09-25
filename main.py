@@ -21,12 +21,33 @@ class cmdSSG(cmd.Cmd):
             logging.info("Exception omitted in case of empty line")
         return line
 
-    # def send(self, msg):
+    def send(self, msg):
+        if len(msg) % 2:
+            msg = "0" + msg  # add zero to hex if length of string is odd
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect((self.ip, int(self.port)))
+            sock.settimeout(self.TIMEOUT)
+            sock.send(msg.encode("utf-8"))
+        except socket.timeout:
+            msg = "Socket timeout. Data not received"
+            self.log_error(msg)
+        except OSError:
+            msg = "OS error. Trace in log."
+            self.log_exception(msg)
+        except KeyboardInterrupt:
+            self.log_info("Method manually interrupted. Back to main loop")
+        finally:
+            sock.close()
+
+    # def send3(self, msg):
+    #     if len(msg) %2:
+    #         msg = '0' + msg
     #     try:
     #         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     #         sock.connect((self.ip, int(self.port)))
     #         sock.settimeout(self.TIMEOUT)
-    #         sock.send(msg.encode("utf-8"))
+    #         sock.send(bytes.fromhex(msg))
     #         sock.close()
     #     except socket.timeout:
     #         msg = "Socket timeout. Data not received"
@@ -36,23 +57,6 @@ class cmdSSG(cmd.Cmd):
     #         self.log_exception(msg)
     #     except KeyboardInterrupt:
     #         self.log_info("Method manually interrupted. Back to main loop")
-    def send(self, msg):
-        if len(msg) %2:
-            msg = '0' + msg
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.connect((self.ip, int(self.port)))
-            sock.settimeout(self.TIMEOUT)
-            sock.send(bytes.fromhex(msg))
-            sock.close()
-        except socket.timeout:
-            msg = "Socket timeout. Data not received"
-            self.log_error(msg)
-        except OSError:
-            msg = "OS error. Trace in log."
-            self.log_exception(msg)
-        except KeyboardInterrupt:
-            self.log_info("Method manually interrupted. Back to main loop")
 
     def log_exception(self, msg):
         logging.exception(msg=msg)
@@ -71,16 +75,17 @@ class cmdSSG(cmd.Cmd):
         print(msg)
 
     def streamDown(self):
-        # TODO: keyboardinterrupt
-        logging.info("streamDown method used")
+        # TODO: keyboardinterrupt na windowsie nie dziala?
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.connect((self.ip, int(self.port)))
+            sock.bind((self.ip, int(self.port)))
             self.log_info("Waiting for data...")
             if os.path.exists(self.results_file):
-                aw = 'a'
+                #aw = 'a'
+                aw = 'ab'  # open in binary mode
             else:
-                aw = 'w'
+                #aw = 'w'
+                aw = 'wb' # open in binary mode
             try:
                 f = open(self.results_file, aw)
                 while True:
@@ -94,7 +99,9 @@ class cmdSSG(cmd.Cmd):
                         self.log_info("Method manually interrupted. Back to main loop")
                     else:
                         data, address = sock.recvfrom(self.BUFFER_SIZE)
-                        f.write(data.decode("utf-8"))
+                        #f.write(data.decode("utf-8"))
+                        f.write(data)  # save to file in binary mode
+                        print(data)
             except OSError:
                 msg = "OS error. Trace in log."
                 self.log_exception(msg)
@@ -282,10 +289,15 @@ class cmdSSG(cmd.Cmd):
         self.streamDown()
 
     def do_downstream_on(self, args):
-        """Start downstream"""
+        """Send command to start downstream and start downstream"""
+        msg = "FFFFFF"
+        self.send(msg)
+        self.streamDown()
 
     def do_downstream_off(self, args):
         """Stop downstream"""
+        msg = "FFFFFF"
+        self.send(msg)
 
     def do_stopm(self, args):
         """Stop motors"""
