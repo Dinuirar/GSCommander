@@ -68,14 +68,14 @@ class cmdSSG(cmd.Cmd):
                 msg = self.ip + " " + str(self.port)
                 fo.write(msg)
             except OSError as e:
-                log_exception("OS error: " + e)
+                log_exception("OS error: " + str(e))
                 raise SystemExit
             finally:
                 fo.close()
 
                 log_info("Address parameters: " + self.ip + " " + str(self.port))
         except ValueError as e:
-            log_error("OS error: " + e + "\nPlease review how config.cfg file looks like")
+            log_error("OS error: " + str(e) + "\nPlease review how config.cfg file looks like")
             f.close()
             raise SystemExit
         else:
@@ -89,9 +89,9 @@ class cmdSSG(cmd.Cmd):
                 tmp1, tmp2 = line.split()
                 self.command_dict[tmp2] = tmp1
         except KeyError as e:
-            log_error("key is not in the map. Original message: " + e)
+            log_error("key is not in the map. Original message: " + str(e))
         except OSError as e:
-            log_exception("OS error: " + e)
+            log_exception("OS error: " + str(e))
             raise SystemExit
         finally:
             f.close()
@@ -229,10 +229,10 @@ class cmdSSG(cmd.Cmd):
         arg2 = int(arg2)
         if (arg1 == 1 or arg1 == 2) and (arg2 > 0 and arg2 < 256):
             if arg1 == 1:
-                self.speed1 = arg2;
+                self.speed1 = arg2
                 log_info("speed of motor no 1 is set to {0}".format(arg2))
             elif arg1 == 2:
-                self.speed2 = arg2;
+                self.speed2 = arg2
                 log_info("speed of motor no 2 is set to {0}".format(arg2))
         elif not (arg1 == 1 or arg1 == 2):
             log_warning("First argument must be 1 or 2! Enter 'help' for more info")
@@ -279,7 +279,7 @@ class cmdSSG(cmd.Cmd):
             f.write(line)
             log_info("ip set to: " + self.ip)
         except ValueError as e:
-            log_exception("OS error: " + e + "\nPlease review how config.cfg file looks like")
+            log_exception("OS error: " + str(e) + "\nPlease review how config.cfg file looks like")
             raise SystemExit
         else:
             f.close()
@@ -294,7 +294,7 @@ class cmdSSG(cmd.Cmd):
             f.write(line)
             log_info("port set to: " + self.port)
         except ValueError as e:
-            log_exception("OS error: " + e + "\nPlease review how config.cfg file looks like")
+            log_exception("OS error: " + str(e) + "\nPlease review how config.cfg file looks like")
             raise SystemExit
         else:
             f.close()
@@ -310,7 +310,7 @@ class cmdSSG(cmd.Cmd):
             log_info("ip set to: " + self.ip)
             log_info("port set to: " + self.port)
         except ValueError as e:
-            log_exception("OS error: " + e + "\nPlease review how config.cfg file looks like")
+            log_exception("OS error: " + str(e) + "\nPlease review how config.cfg file looks like")
             raise SystemExit
         else:
             f.close()

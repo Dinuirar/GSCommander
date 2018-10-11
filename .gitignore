@@ -4,3 +4,5 @@ tcp_OBC.py
 readings.txt
 *.log
 notes
+OBC_send.py
+OBC_tcp.py
