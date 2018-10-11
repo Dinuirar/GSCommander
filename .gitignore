@@ -3,3 +3,4 @@ config.cfg
 tcp_OBC.py
 readings.txt
 *.log
+notes
