@@ -91,11 +91,13 @@ class cmdSSG(cmd.Cmd):
                 while True:
                     # if timeout show message and continue, else save data to file
                     try:
+                        # sock.setblocking(False)
                         sock.settimeout(self.TIMEOUT)
+
                     except socket.timeout:
                         msg = "Socket timeout. Data not received"
                         self.log_error(msg)
-                    except KeyboardInterrupt:
+                    except (KeyboardInterrupt, SystemExit):
                         self.log_info("Method manually interrupted. Back to main loop")
                     else:
                         data, address = sock.recvfrom(self.BUFFER_SIZE)
