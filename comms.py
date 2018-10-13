@@ -3,23 +3,20 @@
 import os
 import socket
 import sys
-import binascii
 
 
-def jpsend(a=0x00, b=0x00, c=0x00):
+def int_to_bytes(x):
+    return x.to_bytes((x.bit_length() + 7) // 8, 'big')
+
+
+def jpsend(a='00', b='00', c='00'):
     print(type(a), a)
-    msg = bytes(3) # + bytearray.fromhex(b) + bytearray.fromhex(c)
-    msg=b'\x09\x00\x21'
+    # msg = bytes(3) # + bytearray.fromhex(b) + bytearray.fromhex(c)
+    # msg=int_to_bytes(a)
+    offset = bytearray.fromhex('00')+bytearray.fromhex('00')+bytearray.fromhex('00')+bytearray.fromhex('00')+bytearray.fromhex('00')+bytearray.fromhex('00')+bytearray.fromhex('00')+bytearray.fromhex('00')+bytearray.fromhex('00')+bytearray.fromhex('00')
+    msg = offset + bytearray.fromhex(a) +bytearray.fromhex(b) + bytearray.fromhex(c)
     print(msg)
-    a = 88
-    # msg[0] = a.to_bytes(1)
-    # print(msg[0])
-    # msg[1] = b;
-    # msg[2] = c;
-    # print(msg)
-    # print(sys.stderr, 'sending "%s"' % msg)
     sock.sendall(msg)
-
 
 # Create a TCP/IP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -36,24 +33,22 @@ except:
 command = ""
 
 while command != "quit":
-    # message = bytearray.fromhex('0E')
+    # message = bytearray.fromhex('e0')
     # sock.sendall(message)
-    # command = input("JP2$ ")
-    command = "stopm"
+    command = input("JP2$ ")
+
     if command == "quit" or command == "exit" or command == "q":
         break
     elif command == "help":
-
         continue
     elif command == "stopm":
         try:
-            jpsend(0xf3)
+            jpsend('06','00','00')
             print("stop motor")
         except:
             print("could not send message")
         continue
     elif command == "clear":
-
         continue
     elif command == "coefficients":
         continue
