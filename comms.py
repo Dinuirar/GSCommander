@@ -4,14 +4,19 @@ import os
 import socket
 import sys
 import binascii
+import time
 
 
-def jpsend(a=0x00, b=0x00, c=0x00):
+def int_to_bytes(x):
+    return x.to_bytes((x.bit_length() + 7) // 8, 'big')
+
+
+def jpsend(a='00', b='00', c='00'):
     print(type(a), a)
-    msg = bytes(3) # + bytearray.fromhex(b) + bytearray.fromhex(c)
-    msg=b'\x09\x00\x21'
+    # msg = bytes(3) # + bytearray.fromhex(b) + bytearray.fromhex(c)
+    # msg=int_to_bytes(a)
+    msg = bytearray.fromhex(a) +bytearray.fromhex(b) + bytearray.fromhex(c)
     print(msg)
-    a = 88
     # msg[0] = a.to_bytes(1)
     # print(msg[0])
     # msg[1] = b;
@@ -36,10 +41,11 @@ except:
 command = ""
 
 while command != "quit":
-    # message = bytearray.fromhex('0E')
-    # sock.sendall(message)
-    # command = input("JP2$ ")
-    command = "stopm"
+    message = bytearray.fromhex('e0')
+    sock.sendall(message)
+    command = input("JP2$ ")
+
+
     if command == "quit" or command == "exit" or command == "q":
         break
     elif command == "help":
@@ -47,7 +53,9 @@ while command != "quit":
         continue
     elif command == "stopm":
         try:
-            jpsend(0xf3)
+            jpsend('f3')
+            # msg = bytearray.fromhex('0E')
+            # sock.sendall(msg)
             print("stop motor")
         except:
             print("could not send message")
