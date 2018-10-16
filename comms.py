@@ -4,6 +4,9 @@ import os
 import socket
 import sys
 
+# TODO:
+# 1. save new logfile
+# 2. clear screen
 
 # def int_to_bytes(x):
 #     return x.to_bytes((x.bit_length() + 7) // 8, 'big')
